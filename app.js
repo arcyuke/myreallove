@@ -58,9 +58,22 @@
     const items=galleryMedia(c);if(!items.length)return '';
     return `<div class="chapter-album" data-album="${c.prefix}"><figure class="album-frame"><button class="media-button album-main" data-photo="${escape(items[0].name)}" data-group="${c.prefix}" data-gallery-index="0" aria-label="Открыть фото: ${escape(caption)}">${imgMarkup(items[0],caption)}</button><figcaption><span>${escape(caption)}</span><small class="album-count">1 / ${items.length}</small></figcaption></figure>${items.length>1?`<div class="album-thumbs" aria-label="Выбрать фотографию">${items.map((item,i)=>`<button class="album-thumb" data-album-select="${i}" aria-label="Фото ${i+1}" aria-pressed="${i===0}">${imgMarkup(item,`Фото ${i+1}`)}</button>`).join('')}</div>`:''}</div>`;
   }
+  function driveVideo(value){
+    if(typeof value!=='string'||!value.trim())return null;
+    try{
+      const url=new URL(value.trim());
+      if(url.protocol!=='https:'||url.hostname!=='drive.google.com')return null;
+      const id=url.pathname.match(/\/file\/(?:u\/\d+\/)?d\/([A-Za-z0-9_-]+)/)?.[1]||url.searchParams.get('id');
+      if(!id||!/^[A-Za-z0-9_-]{10,200}$/.test(id))return null;
+      const resource=url.searchParams.get('resourcekey');
+      const query=resource?'?'+new URLSearchParams({resourcekey:resource}).toString():'';
+      return {embed:`https://drive.google.com/file/d/${id}/preview${query}`,view:`https://drive.google.com/file/d/${id}/view${query}`};
+    }catch{return null;}
+  }
   function video(name,caption,compact=false){
+    const drive=driveVideo(window.STORY_VIDEOS?.[normal(name)]);
     const item=findMedia(name,'video');
-    const body=item?`<video controls playsinline preload="metadata" aria-label="${escape(caption)}"><source src="${escape(item.url)}">Твой браузер не поддерживает это видео. <a href="${escape(item.url)}">Открыть видео</a></video>`:emptyMemory(compact?'Наш громкий вечер.':'У этого воспоминания есть звук. И ты.');
+    const body=drive?`<div class="drive-video"><iframe data-drive-player src="${escape(drive.embed)}" title="${escape(caption)}" loading="lazy" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe><a class="video-external" href="${escape(drive.view)}" target="_blank" rel="noopener noreferrer">Открыть видео отдельно ↗</a></div>`:item?`<video controls playsinline preload="metadata" aria-label="${escape(caption)}"><source src="${escape(item.url)}">Твой браузер не поддерживает это видео. <a href="${escape(item.url)}">Открыть видео</a></video>`:emptyMemory(compact?'Наш громкий вечер.':'У этого воспоминания есть звук. И ты.');
     return compact?body:`<div class="video-shell">${body}</div><div class="video-caption"><span>${escape(caption)}</span><span>для двоих ♡</span></div>`;
   }
   function copy(c){return `<div class="copy reveal-part"><p class="chapter-date">${c.date}</p><h2 tabindex="-1">${c.title}</h2><div class="body-copy">${c.paragraphs.map(p=>`<p>${p}</p>`).join('')}</div>${c.note?`<p class="tiny-note">${c.note}</p>`:''}</div>`;}
@@ -120,6 +133,7 @@
     if(n<0||n>=story.length)return;
     state.busy=true;clearTimeout(toastDelay);$('#achievement').classList.remove('show');
     document.querySelectorAll('video').forEach(v=>v.pause());
+    document.querySelectorAll('[data-drive-player]').forEach(frame=>{frame.src='about:blank';});
     const old=$('#stage .scene');
     if(old&&!reduced){try{await old.animate([{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-15px)'}],{duration:220,easing:'ease-in'}).finished;}catch{}}
     state.chapter=n;window.scrollTo({top:0,behavior:'instant'});render();
