@@ -16,7 +16,26 @@
     const item=mediaFiles.find(path=>normal(path.split('/').pop())===normal(name)&&test.test(path));
     return item?{name,path:item,url:mediaURL(item),type}:null;
   }
-  function allMedia(prefix,count) {return Array.from({length:count},(_,i)=>findMedia(prefix+(i+1))).filter(Boolean);}
+  function allMedia(prefix) {
+    const key=normal(prefix),found=new Map();
+    for(const path of mediaFiles){
+      if(!imagePattern.test(path))continue;
+      const name=normal(path.split('/').pop());
+      if(!name.startsWith(key))continue;
+      const suffix=name.slice(key.length);
+      if(suffix!==''&&!/^\d+$/.test(suffix))continue;
+      if(!found.has(name))found.set(name,{name,path,url:mediaURL(path),type:'image',order:suffix===''?0:Number(suffix)});
+    }
+    return [...found.values()].sort((a,b)=>a.order-b.order||a.path.localeCompare(b.path));
+  }
+  function galleryMedia(c) {
+    if(!c.reuse)return allMedia(c.prefix);
+    const groups=c.reuse.map(allMedia),pool=[],used=new Set();
+    const longest=Math.max(0,...groups.map(items=>items.length));
+    for(let i=0;i<longest;i++)for(const items of groups){const item=items[i];if(item&&!used.has(item.path)){used.add(item.path);pool.push(item);}}
+    if(!pool.length)return [];
+    return Array.from({length:c.count||30},(_,i)=>pool[i%pool.length]);
+  }
   function todayParts() {
     const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Novosibirsk',year:'numeric',month:'numeric',day:'numeric'}).formatToParts(new Date());
     return Object.fromEntries(parts.filter(p=>['year','month','day'].includes(p.type)).map(p=>[p.type,+p.value]));
@@ -35,6 +54,10 @@
     const body=item?`<button class="media-button" data-photo="${escape(name)}" aria-label="Открыть фото: ${escape(caption)}">${imgMarkup(item,caption)}</button>`:emptyMemory();
     return card?`<figure class="memory-card">${body}<figcaption>${escape(caption)}</figcaption></figure>`:body;
   }
+  function album(c,caption){
+    const items=galleryMedia(c);if(!items.length)return '';
+    return `<div class="chapter-album" data-album="${c.prefix}"><figure class="album-frame"><button class="media-button album-main" data-photo="${escape(items[0].name)}" data-group="${c.prefix}" data-gallery-index="0" aria-label="Открыть фото: ${escape(caption)}">${imgMarkup(items[0],caption)}</button><figcaption><span>${escape(caption)}</span><small class="album-count">1 / ${items.length}</small></figcaption></figure>${items.length>1?`<div class="album-thumbs" aria-label="Выбрать фотографию">${items.map((item,i)=>`<button class="album-thumb" data-album-select="${i}" aria-label="Фото ${i+1}" aria-pressed="${i===0}">${imgMarkup(item,`Фото ${i+1}`)}</button>`).join('')}</div>`:''}</div>`;
+  }
   function video(name,caption,compact=false){
     const item=findMedia(name,'video');
     const body=item?`<video controls playsinline preload="metadata" aria-label="${escape(caption)}"><source src="${escape(item.url)}">Твой браузер не поддерживает это видео. <a href="${escape(item.url)}">Открыть видео</a></video>`:emptyMemory(compact?'Наш громкий вечер.':'У этого воспоминания есть звук. И ты.');
@@ -46,20 +69,20 @@
       case 'meet':return `<div class="couple-photos"><figure class="polaroid"><img src="${window.PHOTOS.oleg}" alt="Олег до перекраски, со светлыми волосами"><figcaption>Олег</figcaption></figure><figure class="polaroid"><img src="${window.PHOTOS.nastya}" alt="Настя на закате у реки"><figcaption>Настя</figcaption></figure><button class="like-button ${state.liked?'liked':''}" data-action="like" aria-label="Ответить взаимным лайком" aria-pressed="${state.liked}">${state.liked?'♥':'♡'}</button><p class="handwritten">${state.liked?'взаимно ♡':'всё началось с сердечка'}</p></div>`;
       case 'photo':return photo(c.media,c.caption);
       case 'pair':return `<div class="photo-pair">${photo(c.media[0],'Немного творчества')}${photo(c.media[1],'И много нас')}</div>`;
-      case 'sunrise':return `<div class="dawn-orb ${state.sunrise?'sunrise':''}" aria-hidden="true"></div><p class="dawn-message">${state.sunrise?'Солнце встаёт.<br>А я всё ещё смотрю на тебя.':'То самое утро на балконе.'}</p>`;
+      case 'sunrise':return `${allMedia(c.prefix).length?`<div class="dawn-memory ${state.sunrise?'sunrise':''}">${album(c,'Наш первый рассвет.')}</div>`:`<div class="dawn-orb ${state.sunrise?'sunrise':''}" aria-hidden="true"></div>`}<p class="dawn-message">${state.sunrise?'Солнце встаёт.<br>А я всё ещё смотрю на тебя.':'То самое утро на балконе.'}</p>`;
       case 'lock':return `<div class="lock-interaction ${state.locked?'locked':''}"><div class="initial-heart"><span class="heart-icon" aria-hidden="true">♡</span>Н</div><span class="lock-line" aria-hidden="true"></span><div class="initial-heart"><span class="heart-icon" aria-hidden="true">♡</span>О</div><p class="lock-caption">${state.locked?'Теперь точно никуда друг без друга.':'На моём — Н. На твоём — О.'}</p></div>`;
       case 'newyear':return `<div class="time-display">02:00<small>ЛУЧШАЯ ЧАСТЬ НОЧИ НАЧАЛАСЬ</small></div>${state.gift?'<div class="gift-note">Мой самый любимый подарок — время с тобой.</div>':''}`;
       case 'video':return video(c.media,c.caption);
-      case 'birthday':return `<div class="birthday-number">18<span>И столько всего впереди ♡</span></div>`;
+      case 'birthday':return allMedia(c.prefix).length?`<div class="birthday-album"><span class="birthday-stamp" aria-hidden="true">18 ♡</span>${album(c,'Моя любимая именинница.')}</div>`:`<div class="birthday-number">18<span>И столько всего впереди ♡</span></div>`;
       case 'concert':return `<div class="concert-grid">${[1,2,3].map(n=>photo('kpss'+n,'Мы на концерте · '+n,false)).join('')}</div><div class="concert-clips">${[1,2].map(n=>video('kpss'+n,'Слава КПСС · '+n,true)).join('')}</div>`;
-      case 'wine':return `<div class="centered"><span class="large-symbol" aria-hidden="true">♫</span><p class="dawn-message">У каждого «нас»<br>есть своя музыка.</p><div class="gift-note">Этот вечер.<br>Ты рядом.<br>Больше ничего не нужно.</div></div>`;
-      case 'altai':return `<figure class="altai-photo"><img src="${window.PHOTOS.altai}" alt="Олег у подвесного моста в горах Алтая"><figcaption>Алтай. Там, где мы всё время вместе.</figcaption></figure>`;
+      case 'wine':return findMedia(c.media)?photo(c.media,'Этот вечер. Ты рядом. Наша музыка.'):`<div class="centered"><span class="large-symbol" aria-hidden="true">♫</span><p class="dawn-message">У каждого «нас»<br>есть своя музыка.</p><div class="gift-note">Этот вечер.<br>Ты рядом.<br>Больше ничего не нужно.</div></div>`;
+      case 'altai':return allMedia(c.prefix).length?album(c,'Алтай. Там, где мы всё время вместе.'):`<figure class="altai-photo"><img src="${window.PHOTOS.altai}" alt="Олег у подвесного моста в горах Алтая"><figcaption>Алтай. Там, где мы всё время вместе.</figcaption></figure>`;
       default:return '';
     }
   }
   function galleryMarkup(c){
-    const items=allMedia(c.prefix,c.count);
-    const photos=items.length?items.map((item,i)=>`<button class="film-photo" data-photo="${escape(item.name)}" data-group="${c.prefix}" aria-label="Открыть воспоминание ${i+1}">${imgMarkup(item,`Наше воспоминание · ${i+1}`)}<span>мы / ${String(i+1).padStart(2,'0')}</span></button>`).join(''):[0,1,2].map((n)=>`<div class="film-photo">${emptyMemory(['Всё, что хочется сохранить.','Мой любимый человек.','И ещё столько всего впереди.'][n])}<span>мы / ♡</span></div>`).join('');
+    const items=galleryMedia(c);
+    const photos=items.length?items.map((item,i)=>`<button class="film-photo" data-photo="${escape(item.name)}" data-group="${c.prefix}" data-gallery-index="${i}" aria-label="Открыть воспоминание ${i+1}">${imgMarkup(item,`Наше воспоминание · ${i+1}`)}<span>мы / ${String(i+1).padStart(2,'0')}</span></button>`).join(''):[0,1,2].map((n)=>`<div class="film-photo">${emptyMemory(['Всё, что хочется сохранить.','Мой любимый человек.','И ещё столько всего впереди.'][n])}<span>мы / ♡</span></div>`).join('');
     return `<article class="scene gallery-scene scene-enter" data-scene="${c.id}"><div class="gallery-heading"><div><p class="chapter-date">${c.date}</p><h2 tabindex="-1">${c.title}</h2></div><div class="body-copy"><p>${c.paragraphs.join('</p><p>')}</p></div></div><div class="filmstrip" tabindex="0" aria-label="Лента воспоминаний, можно листать">${photos}</div><div class="gallery-footer"><span>Листай и открывай любимые моменты ↔</span><div class="gallery-tools"><button class="icon-button" data-film="-1" aria-label="Листать фото назад">←</button><button class="icon-button" data-film="1" aria-label="Листать фото вперёд">→</button></div>${c.id==='session'?`<div class="hair-demo"><span class="hair-sprite ${state.dark?'dark':''}" aria-hidden="true"></span><button class="text-action" data-action="hair">${state.dark?'Новый цвет. Всё тот же я ♡':'А теперь — покрасить волосы'} <span>✦</span></button></div>`:''}</div>${c.id==='love'?'<p class="ending-line">История пишется. И мы сами пишем нашу историю.<br>Я люблю тебя, Настя. Твой Олег.</p>':''}</article>`;
   }
   function sceneMarkup(c){
@@ -119,18 +142,21 @@
   async function loadMedia(){
     try{const r=await fetch('./media-index.json',{cache:'no-cache'});if(r.ok){const data=await r.json();mediaFiles=Array.isArray(data.files)?data.files.filter(f=>typeof f==='string'):[];}}
     catch{}
-    if(!mediaFiles.length){try{const r=await fetch('https://api.github.com/repos/arcyuke/myreallove/git/trees/main?recursive=1',{signal:AbortSignal.timeout(8000)});if(r.ok){const data=await r.json();mediaFiles=(data.tree||[]).filter(item=>item.type==='blob'&&(imagePattern.test(item.path)||videoPattern.test(item.path))).map(item=>item.path);}}catch{}}
-    indexReady=true;
     if(state.opened&&!state.busy&&mediaFiles.length)render(false);
+    const previousFiles=mediaFiles.join('\n');
+    // Also discover recent uploads when Pages is deployed directly from the branch.
+    try{const r=await fetch('https://api.github.com/repos/arcyuke/myreallove/git/trees/main?recursive=1',{signal:AbortSignal.timeout(8000)});if(r.ok){const data=await r.json();if(Array.isArray(data.tree)&&!data.truncated)mediaFiles=data.tree.filter(item=>item.type==='blob'&&(imagePattern.test(item.path)||videoPattern.test(item.path))).map(item=>item.path);}}catch{}
+    indexReady=true;
+    if(state.opened&&!state.busy&&mediaFiles.join('\n')!==previousFiles)render(false);
   }
   function showChapters(){
     $('#chapters-list').innerHTML=story.map((c,i)=>`<button data-chapter="${i}" class="${i===state.chapter?'current':''}" ${i===state.chapter?'aria-current="step"':''}><span>${String(i+1).padStart(2,'0')}</span>${escape(c.name)}</button>`).join('');
     $('#chapters-dialog').showModal();
   }
-  function showPhoto(name,group){
-    const chapter=story.find(c=>c.prefix===group);
-    openGallery=chapter?allMedia(chapter.prefix,chapter.count):[findMedia(name)].filter(Boolean);
-    galleryPosition=Math.max(0,openGallery.findIndex(item=>item.name===name));
+  function showPhoto(name,group,index){
+    const chapter=group?story.find(c=>c.prefix===group):null;
+    openGallery=chapter?galleryMedia(chapter):[findMedia(name)].filter(Boolean);
+    galleryPosition=Number.isInteger(index)&&index>=0&&index<openGallery.length?index:Math.max(0,openGallery.findIndex(item=>item.name===name));
     if(!openGallery.length)return;
     drawLightbox();$('#lightbox').showModal();
   }
@@ -145,12 +171,20 @@
   function setHair(dark,celebrate){state.dark=dark;$('#boy').classList.toggle('dark',dark);$('.hair-sprite')?.classList.toggle('dark',dark);if(celebrate){burst(innerWidth*.6,innerHeight*.55,45);achievement('Новый цвет?','Чёрные волосы. Всё тот же любимый я.','✦',true);const b=$('[data-action="hair"]');if(b)b.innerHTML='Новый цвет. Всё тот же я ♡ <span>✦</span>';}}
   $('#stage').addEventListener('click',event=>{
     const button=event.target.closest('button');if(!button)return;
-    if(button.dataset.photo){showPhoto(button.dataset.photo,button.dataset.group);return;}
+    if(button.dataset.albumSelect!==undefined){
+      const holder=button.closest('[data-album]'),c=story.find(item=>item.prefix===holder.dataset.album),items=galleryMedia(c),i=Number(button.dataset.albumSelect),item=items[i];
+      if(!item)return;
+      const main=holder.querySelector('.album-main');main.innerHTML=imgMarkup(item,`Наше воспоминание ${i+1}`);main.dataset.photo=item.name;main.dataset.galleryIndex=String(i);
+      holder.querySelector('.album-count').textContent=`${i+1} / ${items.length}`;
+      holder.querySelectorAll('.album-thumb').forEach((thumb,n)=>thumb.setAttribute('aria-pressed',String(n===i)));
+      attachMediaErrors();return;
+    }
+    if(button.dataset.photo){showPhoto(button.dataset.photo,button.dataset.group,button.dataset.galleryIndex===undefined?undefined:Number(button.dataset.galleryIndex));return;}
     if(button.dataset.film){$('.filmstrip').scrollBy({left:Number(button.dataset.film)*270,behavior:reduced?'instant':'smooth'});return;}
     const rect=button.getBoundingClientRect(),action=button.dataset.action;
     if(!action)return;burst(rect.x+rect.width/2,rect.y+rect.height/2,18);chime();
     if(action==='like'){state.liked=true;button.classList.add('liked');button.textContent='♥';button.setAttribute('aria-pressed','true');$('.handwritten').textContent='взаимно ♡';achievement('Взаимно!','Один лайк изменил всё.','♥');}
-    if(action==='sunrise'){state.sunrise=true;$('.dawn-orb').classList.add('sunrise');$('.dawn-message').innerHTML='Солнце встаёт.<br>А я всё ещё смотрю на тебя.';button.innerHTML='Наше утро ♡';updateBackground('sunrise');}
+    if(action==='sunrise'){state.sunrise=true;$('.dawn-orb')?.classList.add('sunrise');$('.dawn-memory')?.classList.add('sunrise');$('.dawn-message').innerHTML='Солнце встаёт.<br>А я всё ещё смотрю на тебя.';button.innerHTML='Наше утро ♡';updateBackground('sunrise');}
     if(action==='lock'){state.locked=true;$('.lock-interaction').classList.add('locked');$('.lock-caption').textContent='Теперь точно никуда друг без друга.';button.innerHTML='Замочек закрыт ♡';achievement('Под замочком','Ключи — только друг у друга.','⚿',true);}
     if(action==='gift'){state.gift=true;if(!$('.gift-note'))$('.visual').insertAdjacentHTML('beforeend','<div class="gift-note">Мой самый любимый подарок — время с тобой.</div>');button.innerHTML='Ты — мой подарок ♡';}
     if(action==='hair')setHair(true,true);
