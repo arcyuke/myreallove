@@ -100,7 +100,7 @@
   }
   function sceneMarkup(c){
     if(c.kind==='gallery')return galleryMarkup(c);
-    if(c.kind==='breath')return `<article class="scene centered scene-enter" data-scene="${c.id}"><div class="breathing-heart" aria-hidden="true">♡</div>${copy(c)}<p class="breath-note">Побудь здесь столько, сколько хочется.</p></article>`;
+    if(c.kind==='breath')return `<article class="scene centered scene-enter" data-scene="${c.id}"><div class="breathing-heart" aria-hidden="true">♡</div>${copy(c)}<div class="game-invite"><button class="primary" data-action="quest">Наше маленькое приключение <span aria-hidden="true">→</span></button><small>${matchMedia('(pointer:coarse), (max-width:700px)').matches?'Ты играешь, я прикрываю ♡':'На двоих. Одна клавиатура, одна команда ♡'}</small></div><p class="breath-note">Побудь здесь столько, сколько хочется.</p></article>`;
     if(c.kind==='letter')return `<article class="scene letter-scene scene-enter" data-scene="${c.id}"><div class="letter-layout"><div><p class="chapter-date">${c.date}</p><h2 tabindex="-1">${c.title}</h2><p class="letter-signature">Для тебя. Всегда.</p></div><div class="body-copy">${c.paragraphs.map(p=>`<p>${p}</p>`).join('')}<p class="letter-signature">Твой Олег ♡</p></div></div></article>`;
     return `<article class="scene scene-enter" data-scene="${c.id}"><div class="scene-grid">${copy(c)}<div class="visual reveal-part" style="--delay:130ms">${visual(c)}</div></div></article>`;
   }
@@ -202,6 +202,7 @@
     if(action==='lock'){state.locked=true;$('.lock-interaction').classList.add('locked');$('.lock-caption').textContent='Теперь точно никуда друг без друга.';button.innerHTML='Замочек закрыт ♡';achievement('Под замочком','Ключи — только друг у друга.','⚿',true);}
     if(action==='gift'){state.gift=true;if(!$('.gift-note'))$('.visual').insertAdjacentHTML('beforeend','<div class="gift-note">Мой самый любимый подарок — время с тобой.</div>');button.innerHTML='Ты — мой подарок ♡';}
     if(action==='hair')setHair(true,true);
+    if(action==='quest')window.LoveQuest.open({onAchievement:(title,description,icon)=>achievement(title,description,icon),onClose:()=>{last=performance.now();}});
   });
   $('#previous').addEventListener('click',()=>navigate(state.chapter-1));
   $('#next').addEventListener('click',()=>navigate(state.chapter===story.length-1?0:state.chapter+1));
@@ -212,7 +213,7 @@
   $('#lightbox-prev').addEventListener('click',()=>movePhoto(-1));$('#lightbox-next').addEventListener('click',()=>movePhoto(1));
   $('#sound').addEventListener('click',()=>{state.sound=!state.sound;$('#sound').setAttribute('aria-pressed',String(state.sound));$('#sound').setAttribute('aria-label',state.sound?'Выключить звуки':'Включить звуки');$('#sound span').textContent=state.sound?'звук вкл.':'звук выкл.';chime();});
   document.addEventListener('keydown',e=>{
-    if(!state.opened||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;
+    if(!state.opened||window.LoveQuest?.active||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;
     if($('#lightbox').open){if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();movePhoto(e.key==='ArrowLeft'?-1:1);}return;}
     if($('#chapters-dialog').open||e.target.closest('input,textarea,video,.filmstrip'))return;
     if(e.key==='ArrowRight'){e.preventDefault();navigate(Math.min(state.chapter+1,story.length-1));}
@@ -228,12 +229,28 @@
   function burst(x,y,count=25){if(reduced)return;for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=80+Math.random()*280;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,size:5+Math.random()*12,life:2+Math.random()*1.5,max:3.5,angle:Math.random()*6,spin:(Math.random()-.5)*3,burst:true});}particles=particles.slice(-180);}
   function paintHeart(p){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);ctx.globalAlpha=p.burst?Math.min(1,p.life):.16;ctx.fillStyle=p.burst?'#ffb6d1':'#ee9abe';ctx.beginPath();const s=p.size;ctx.moveTo(0,s*.4);ctx.bezierCurveTo(-s*1.15,-s*.3,-s*.6,-s,0,-s*.45);ctx.bezierCurveTo(s*.6,-s,s*1.15,-s*.3,0,s*.4);ctx.fill();ctx.restore();}
   const actors=[{el:$('#boy'),x:innerWidth*.1,y:innerHeight-220,target:innerWidth*.2,targetY:innerHeight-220,speed:32,pause:2},{el:$('#girl'),x:innerWidth*.82,y:innerHeight-220,target:innerWidth*.68,targetY:innerHeight-220,speed:27,pause:4}];
-  actors.forEach((actor,i)=>actor.el.addEventListener('click',()=>{actor.pause=3;actor.target=actor.x;actor.targetY=actor.y;const text=[['Я рядом ♡','Люблю тебя','Твой Олег'],['И я рядом ♡','Ещё одно сердечко?','Твоя Настя']][i];actor.el.querySelector('.bubble').textContent=text[Math.floor(Math.random()*text.length)];actor.el.classList.add('talking');const r=actor.el.getBoundingClientRect();burst(r.x+r.width/2,r.y+15,15);setTimeout(()=>actor.el.classList.remove('talking'),2800);chime();}));
+  const snacks={pizza:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path fill="#9d5531" d="M2 3h20v5H2z"/><path fill="#efb76b" d="M3 2h18v4H3z"/><path fill="#ffdf8c" d="M3 7h18v3H19v4h-3v4h-3v4h-2v-4H8v-4H5v-4H3z"/><path fill="#be4155" d="M6 8h4v4H6zm8 1h4v4h-4zm-4 5h4v3h-4z"/></svg>',energy:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path fill="#bfc0cf" d="M7 2h10v3H7zm0 17h10v3H7z"/><path fill="#393044" d="M6 5h12v14H6z"/><path fill="#d99ac9" d="M8 5h8v14H8z"/><path fill="#fff0cb" d="M12 6h3l-3 5h3l-5 7 1-5H9z"/></svg>'};
+  let meeting=null,meetingClock=0,meetingCount=0;
+  actors.forEach(actor=>{const gift=document.createElement('span');gift.className='walker-gift';gift.setAttribute('aria-hidden','true');actor.el.append(gift);});
+  function meetingUpdate(dt){
+    meetingClock+=dt;
+    if(!meeting&&meetingClock>=15){meetingClock=0;meeting={phase:'run',time:0,swapped:false};actors.forEach((a,i)=>{a.pause=0;a.el.classList.add('carrying','running');a.el.querySelector('.walker-gift').innerHTML=i===0?snacks.pizza:snacks.energy;});}
+    if(!meeting)return false;
+    const center=(w-80)/2,y=Math.max(115,h-215);
+    if(meeting.phase==='run'){
+      let arrived=true;
+      actors.forEach((a,i)=>{const tx=center+(i===0?-39:39),dx=tx-a.x,dy=y-a.y,d=Math.hypot(dx,dy),step=Math.min(d,230*dt);if(d>2){arrived=false;a.x+=dx/d*step;a.y+=dy/d*step;}a.el.classList.toggle('walking',d>2);a.el.classList.toggle('left',dx<0);});
+      if(arrived){meeting.phase='share';meeting.time=0;meetingCount++;const lines=meetingCount%2?[['Угощайся, любимая. Это тебе ♡','А это тебе! Сил на обнимашки ♡']][0]:['Пицца вкуснее, когда делимся ♡','И всё лучше, когда мы рядом ♡'];actors.forEach((a,i)=>{a.el.classList.remove('running','walking');a.el.classList.add('talking','sharing');a.el.classList.toggle('left',i===1);a.el.querySelector('.bubble').textContent=lines[i];});burst(w/2,y+18,20);chime();}
+    }else{meeting.time+=dt;if(meeting.time>2.5&&!meeting.swapped){meeting.swapped=true;actors.forEach((a,i)=>a.el.querySelector('.walker-gift').innerHTML=i===0?snacks.energy:snacks.pizza);burst(w/2,y+30,10);}if(meeting.time>4.5){actors.forEach((a,i)=>{a.el.classList.remove('carrying','talking','sharing');a.pause=1;a.target=i===0?Math.max(6,a.x-150):Math.min(w-100,a.x+150);a.targetY=y;});meeting=null;}}
+    actors.forEach(a=>a.el.style.transform=`translate3d(${a.x}px,${a.y}px,0)`);
+    return true;
+  }
+  actors.forEach((actor,i)=>actor.el.addEventListener('click',()=>{if(meeting)return;actor.pause=3;actor.target=actor.x;actor.targetY=actor.y;const text=[['Я рядом ♡','Люблю тебя','Твой Олег'],['И я рядом ♡','Ещё одно сердечко?','Твоя Настя']][i];actor.el.querySelector('.bubble').textContent=text[Math.floor(Math.random()*text.length)];actor.el.classList.add('talking');const r=actor.el.getBoundingClientRect();burst(r.x+r.width/2,r.y+15,15);setTimeout(()=>actor.el.classList.remove('talking'),2800);chime();}));
   function animate(t){
     const dt=Math.min((t-last)/1000||.016,.05);last=t;ctx.clearRect(0,0,w,h);
     if(state.opened&&!reduced){
       if(t-lastRain>550&&particles.length<150){particles.push({x:Math.random()*w,y:-20,vx:(Math.random()-.5)*13,vy:23+Math.random()*24,size:4+Math.random()*8,life:45,angle:Math.random()*3,spin:(Math.random()-.5)*.4});lastRain=t;}
-      actors.forEach(actor=>{const maxX=Math.max(6,w-100),maxY=Math.max(115,h-215);actor.x=Math.max(6,Math.min(maxX,actor.x));actor.y=Math.max(115,Math.min(maxY,actor.y));actor.target=Math.max(6,Math.min(maxX,actor.target));actor.targetY=Math.max(115,Math.min(maxY,actor.targetY));const dx=actor.target-actor.x,dy=actor.targetY-actor.y,dist=Math.hypot(dx,dy);if(actor.pause>0){actor.pause-=dt;actor.el.classList.remove('walking');}else if(dist<3){actor.target=6+Math.random()*Math.max(0,maxX-6);actor.targetY=Math.random()<.7?maxY:115+Math.random()*Math.max(0,maxY-115);actor.pause=1+Math.random()*3;}else{actor.x+=dx/dist*actor.speed*dt;actor.y+=dy/dist*actor.speed*dt;actor.el.classList.add('walking');actor.el.classList.toggle('left',dx<0);}actor.el.style.transform=`translate3d(${actor.x}px,${actor.y}px,0)`;});
+      if(!window.LoveQuest?.active&&!document.querySelector('dialog[open]')&&!meetingUpdate(dt))actors.forEach(actor=>{const maxX=Math.max(6,w-100),maxY=Math.max(115,h-215);actor.x=Math.max(6,Math.min(maxX,actor.x));actor.y=Math.max(115,Math.min(maxY,actor.y));actor.target=Math.max(6,Math.min(maxX,actor.target));actor.targetY=Math.max(115,Math.min(maxY,actor.targetY));const dx=actor.target-actor.x,dy=actor.targetY-actor.y,dist=Math.hypot(dx,dy);if(actor.pause>0){actor.pause-=dt;actor.el.classList.remove('walking');}else if(dist<3){actor.target=6+Math.random()*Math.max(0,maxX-6);actor.targetY=Math.random()<.7?maxY:115+Math.random()*Math.max(0,maxY-115);actor.pause=1+Math.random()*3;}else{actor.x+=dx/dist*actor.speed*dt;actor.y+=dy/dist*actor.speed*dt;actor.el.classList.add('walking');actor.el.classList.toggle('left',dx<0);}actor.el.style.transform=`translate3d(${actor.x}px,${actor.y}px,0)`;});
     }
     particles=particles.filter(p=>p.life>0&&p.y<h+35);particles.forEach(p=>{p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.angle+=p.spin*dt;if(p.burst){p.vy+=65*dt;p.vx*=.994;}paintHeart(p);});
     frameId=requestAnimationFrame(animate);
