@@ -87,7 +87,7 @@
       case 'newyear':return `<div class="time-display">02:00<small>ЛУЧШАЯ ЧАСТЬ НОЧИ НАЧАЛАСЬ</small></div>${state.gift?'<div class="gift-note">Мой самый любимый подарок — время с тобой.</div>':''}`;
       case 'video':return video(c.media,c.caption);
       case 'birthday':return allMedia(c.prefix).length?`<div class="birthday-album"><span class="birthday-stamp" aria-hidden="true">18 ♡</span>${album(c,'Моя любимая именинница.')}</div>`:`<div class="birthday-number">18<span>И столько всего впереди ♡</span></div>`;
-      case 'concert':return `<div class="concert-grid">${[1,2,3].map(n=>photo('kpss'+n,'Мы на концерте · '+n,false)).join('')}</div><div class="concert-clips">${[1,2].map(n=>video('kpss'+n,'Слава КПСС · '+n,true)).join('')}</div>`;
+      case 'concert':return `<div class="concert-grid">${[1,2,3].map(n=>photo('kpss'+n,'Мы на концерте · '+n,false)).join('')}</div><div class="concert-clips">${video(c.media,'Слава КПСС. Наш вечер.',true)}</div>`;
       case 'wine':return findMedia(c.media)?photo(c.media,'Этот вечер. Ты рядом. Наша музыка.'):`<div class="centered"><span class="large-symbol" aria-hidden="true">♫</span><p class="dawn-message">У каждого «нас»<br>есть своя музыка.</p><div class="gift-note">Этот вечер.<br>Ты рядом.<br>Больше ничего не нужно.</div></div>`;
       case 'altai':return allMedia(c.prefix).length?album(c,'Алтай. Там, где мы всё время вместе.'):`<figure class="altai-photo"><img src="${window.PHOTOS.altai}" alt="Олег у подвесного моста в горах Алтая"><figcaption>Алтай. Там, где мы всё время вместе.</figcaption></figure>`;
       default:return '';
