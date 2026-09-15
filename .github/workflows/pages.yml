@@ -1,0 +1,49 @@
+name: Publish our story
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare site and find photos and videos
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, shutil
+          root = pathlib.Path('.')
+          out = pathlib.Path('_site')
+          out.mkdir(exist_ok=True)
+          excluded = {'.git', '.github', '_site', 'node_modules', '.sites-runtime', '.openai'}
+          extensions = {'.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif', '.mp4', '.webm', '.mov', '.m4v', '.ogv'}
+          files = []
+          for path in sorted(root.rglob('*')):
+              if not path.is_file() or any(part in excluded for part in path.parts):
+                  continue
+              if path.name in {'README.md', 'AGENTS.md'}:
+                  continue
+              target = out / path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(path, target)
+              if path.suffix.lower() in extensions:
+                  files.append(path.as_posix())
+          (out / 'media-index.json').write_text(json.dumps({'files': files}, ensure_ascii=False), encoding='utf-8')
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
