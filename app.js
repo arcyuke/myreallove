@@ -228,29 +228,196 @@
   resizeCanvas();addEventListener('resize',resizeCanvas);
   function burst(x,y,count=25){if(reduced)return;for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=80+Math.random()*280;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,size:5+Math.random()*12,life:2+Math.random()*1.5,max:3.5,angle:Math.random()*6,spin:(Math.random()-.5)*3,burst:true});}particles=particles.slice(-180);}
   function paintHeart(p){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);ctx.globalAlpha=p.burst?Math.min(1,p.life):.16;ctx.fillStyle=p.burst?'#ffb6d1':'#ee9abe';ctx.beginPath();const s=p.size;ctx.moveTo(0,s*.4);ctx.bezierCurveTo(-s*1.15,-s*.3,-s*.6,-s,0,-s*.45);ctx.bezierCurveTo(s*.6,-s,s*1.15,-s*.3,0,s*.4);ctx.fill();ctx.restore();}
-  const actors=[{el:$('#boy'),x:innerWidth*.1,y:innerHeight-220,target:innerWidth*.2,targetY:innerHeight-220,speed:32,pause:2},{el:$('#girl'),x:innerWidth*.82,y:innerHeight-220,target:innerWidth*.68,targetY:innerHeight-220,speed:27,pause:4}];
-  const snacks={pizza:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path fill="#9d5531" d="M2 3h20v5H2z"/><path fill="#efb76b" d="M3 2h18v4H3z"/><path fill="#ffdf8c" d="M3 7h18v3H19v4h-3v4h-3v4h-2v-4H8v-4H5v-4H3z"/><path fill="#be4155" d="M6 8h4v4H6zm8 1h4v4h-4zm-4 5h4v3h-4z"/></svg>',energy:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path fill="#bfc0cf" d="M7 2h10v3H7zm0 17h10v3H7z"/><path fill="#393044" d="M6 5h12v14H6z"/><path fill="#d99ac9" d="M8 5h8v14H8z"/><path fill="#fff0cb" d="M12 6h3l-3 5h3l-5 7 1-5H9z"/></svg>'};
-  let meeting=null,meetingClock=0,meetingCount=0;
-  actors.forEach(actor=>{const gift=document.createElement('span');gift.className='walker-gift';gift.setAttribute('aria-hidden','true');actor.el.append(gift);});
-  function meetingUpdate(dt){
-    meetingClock+=dt;
-    if(!meeting&&meetingClock>=15){meetingClock=0;meeting={phase:'run',time:0,swapped:false};actors.forEach((a,i)=>{a.pause=0;a.el.classList.add('carrying','running');a.el.querySelector('.walker-gift').innerHTML=i===0?snacks.pizza:snacks.energy;});}
-    if(!meeting)return false;
-    const center=(w-80)/2,y=Math.max(115,h-215);
-    if(meeting.phase==='run'){
-      let arrived=true;
-      actors.forEach((a,i)=>{const tx=center+(i===0?-39:39),dx=tx-a.x,dy=y-a.y,d=Math.hypot(dx,dy),step=Math.min(d,230*dt);if(d>2){arrived=false;a.x+=dx/d*step;a.y+=dy/d*step;}a.el.classList.toggle('walking',d>2);a.el.classList.toggle('left',dx<0);});
-      if(arrived){meeting.phase='share';meeting.time=0;meetingCount++;const lines=meetingCount%2?[['Угощайся, любимая. Это тебе ♡','А это тебе! Сил на обнимашки ♡']][0]:['Пицца вкуснее, когда делимся ♡','И всё лучше, когда мы рядом ♡'];actors.forEach((a,i)=>{a.el.classList.remove('running','walking');a.el.classList.add('talking','sharing');a.el.classList.toggle('left',i===1);a.el.querySelector('.bubble').textContent=lines[i];});burst(w/2,y+18,20);chime();}
-    }else{meeting.time+=dt;if(meeting.time>2.5&&!meeting.swapped){meeting.swapped=true;actors.forEach((a,i)=>a.el.querySelector('.walker-gift').innerHTML=i===0?snacks.energy:snacks.pizza);burst(w/2,y+30,10);}if(meeting.time>4.5){actors.forEach((a,i)=>{a.el.classList.remove('carrying','talking','sharing');a.pause=1;a.target=i===0?Math.max(6,a.x-150):Math.min(w-100,a.x+150);a.targetY=y;});meeting=null;}}
-    actors.forEach(a=>a.el.style.transform=`translate3d(${a.x}px,${a.y}px,0)`);
-    return true;
+  const between=(min,max)=>min+Math.random()*(max-min);
+  const limit=(value,min,max)=>Math.max(min,Math.min(max,value));
+  function walkBounds(){
+    const size=w<=700?88:108,maxY=Math.max(8,h-104-size);
+    return {size,minX:8,maxX:Math.max(8,w-size-8),minY:Math.min(125,maxY),maxY};
   }
-  actors.forEach((actor,i)=>actor.el.addEventListener('click',()=>{if(meeting)return;actor.pause=3;actor.target=actor.x;actor.targetY=actor.y;const text=[['Я рядом ♡','Люблю тебя','Твой Олег'],['И я рядом ♡','Ещё одно сердечко?','Твоя Настя']][i];actor.el.querySelector('.bubble').textContent=text[Math.floor(Math.random()*text.length)];actor.el.classList.add('talking');const r=actor.el.getBoundingClientRect();burst(r.x+r.width/2,r.y+15,15);setTimeout(()=>actor.el.classList.remove('talking'),2800);chime();}));
+  const actors=[
+    {el:$('#boy'),x:w*.1,y:h-220,speed:47},
+    {el:$('#girl'),x:w*.79,y:h-220,speed:43}
+  ];
+  const snacks={
+    pizza:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path fill="#9d5531" d="M2 3h20v5H2z"/><path fill="#efb76b" d="M3 2h18v4H3z"/><path fill="#ffdf8c" d="M3 7h18v3H19v4h-3v4h-3v4h-2v-4H8v-4H5v-4H3z"/><path fill="#be4155" d="M6 8h4v4H6zm8 1h4v4h-4zm-4 5h4v3h-4z"/></svg>',
+    energy:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path fill="#bfc0cf" d="M7 2h10v3H7zm0 17h10v3H7z"/><path fill="#393044" d="M6 5h12v14H6z"/><path fill="#d99ac9" d="M8 5h8v14H8z"/><path fill="#fff0cb" d="M12 6h3l-3 5h3l-5 7 1-5H9z"/></svg>',
+    shawarma:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path fill="#80a763" d="M6 3h4V1h4v2h4v6H6z"/><path fill="#cc6653" d="M7 4h4v4H7zm7-2h3v5h-3z"/><path fill="#e7bd82" d="M4 7h16v5h-2v7h-2v4H8v-4H6v-7H4z"/><path fill="#b48257" d="M6 10h3v4H6zm7-2h3v3h-3zm-3 9h5v2h-5z"/><path fill="#fff0dc" d="M6 14h3v2h9v3h-2v4H8v-4H6z"/></svg>',
+    coffee:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><g class="snack-steam" fill="#fff0db"><path d="M8 1h2v4H8zm6 1h2v3h-2z"/></g><path fill="#f7dbbf" d="M4 7h15v11h-2v3H6v-3H4zm15 2h4v7h-4v-2h2v-3h-2z"/><path fill="#87482f" d="M6 7h11v3H6z"/><path fill="#d7798b" d="M8 12h3v2h2v-2h3v4h-2v2h-4v-2H8z"/><path fill="#cdb4b8" d="M3 22h17v2H3z"/></svg>',
+    sushi:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><path fill="#b97c63" d="M1 13h22v7H1z"/><path fill="#5f3741" d="M3 20h3v3H3zm15 0h3v3h-3z"/><path fill="#fff0d7" d="M3 8h8v7H3zm10 0h8v7h-8z"/><path fill="#eb9981" d="M2 5h10v5H2zm10 0h10v5H12z"/><path fill="#ffd4b1" d="M4 5h2v5H4zm11 0h2v5h-2z"/><path fill="#3c5244" d="M8 5h2v10H8zm10 0h2v10h-2z"/></svg>',
+    tomyam:'<svg viewBox="0 0 24 24" shape-rendering="crispEdges"><g class="snack-steam" fill="#ffe6cc"><path d="M7 1h2v4H7zm8 0h2v5h-2z"/></g><path fill="#b84d34" d="M3 8h18v7H3z"/><path fill="#f4a357" d="M5 8h14v5H5z"/><path fill="#f8d9a4" d="M7 8h3v2H8v2H6V9h1zm8 1h3v3h-4v-2h1z"/><path fill="#6b9a55" d="M11 7h3v3h-3z"/><path fill="#fbe0d4" d="M1 12h22v4h-2v3h-3v2H6v-2H3v-3H1z"/><path fill="#cf8599" d="M7 21h10v2H7z"/></svg>'
+  };
+  // Перемешанная колода: все десять сценок появляются до повторения.
+  const encounters=[
+    {kind:'gift',gifts:['pizza','energy'],first:0,lines:['Угощайся, любимая. Пицца для тебя ♡','А тебе энергетик. Для долгих обнимашек!']},
+    {kind:'gift',gifts:['','shawarma'],first:1,lines:['Ты знаешь самый вкусный путь к моему сердцу ♡','Несла тебе шаурму. Даже не откусила!']},
+    {kind:'gift',gifts:['coffee',''],first:0,lines:['Кофе для тебя. Поцелуй с меня ♡','С тобой даже обычный день — свидание.']},
+    {kind:'gift',gifts:['','sushi'],first:1,lines:['Последний ролл тебе. Вот такая любовь ♡','Я принесла суши! Устроим маленькое свидание?']},
+    {kind:'gift',gifts:['tomyam',''],first:0,lines:['Том ям для моей любимой. Осторожно, горячий!','Сначала суп. Потом обниму своего повара ♡']},
+    {kind:'hug',first:0,lines:['Просто захотел тебя обнять ♡','Вот так и стой. Мне очень хорошо.']},
+    {kind:'hug',first:1,lines:['Я тоже соскучился. Иди ко мне ♡','Мы виделись минуту назад. Я уже скучаю!']},
+    {kind:'hug',first:0,lines:['Ты моё самое любимое место на свете.','А ты мой дом. Даже посреди этой страницы ♡']},
+    {kind:'makeup',offended:1,first:0,pout:'Я чуть-чуть обиделась…',lines:['Люблю тебя. Прости ♡','И я тебя люблю. Обними покрепче.']},
+    {kind:'makeup',offended:0,first:1,pout:'Я немножко надулся…',lines:['Всё, больше не дуюсь. Иди в мои объятия ♡','Люблю тебя. Прости. Давай обнимемся?']}
+  ];
+  let encounterDeck=[],lastEncounter=null,meeting=null,dispersing=false;
+  let meetingClock=0,nextMeetingAfter=between(30,42);
+  function randomMeetingGap(){
+    const chance=Math.random();
+    return chance<.3?between(22,30):chance<.75?between(34,44):between(48,62);
+  }
+  function nextEncounter(){
+    if(!encounterDeck.length){
+      encounterDeck=[...encounters];
+      for(let i=encounterDeck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[encounterDeck[i],encounterDeck[j]]=[encounterDeck[j],encounterDeck[i]];}
+      if(encounterDeck.at(-1)===lastEncounter)[encounterDeck[0],encounterDeck[encounterDeck.length-1]]=[encounterDeck.at(-1),encounterDeck[0]];
+    }
+    return lastEncounter=encounterDeck.pop();
+  }
+  function walkTarget(actor,side){
+    const b=walkBounds(),span=b.maxX-b.minX;
+    if(side!==undefined){
+      actor.target=b.minX+span*(side===0?between(.02,.15):between(.85,.98));
+      actor.targetY=between(b.minY,b.maxY);return;
+    }
+    const minimum=Math.min(180,Math.hypot(span,b.maxY-b.minY)*.35);
+    let best={x:actor.x,y:actor.y,d:-1};
+    for(let attempt=0;attempt<12;attempt++){
+      const x=between(b.minX,b.maxX),y=Math.random()<.25?b.maxY:between(b.minY,b.maxY),d=Math.hypot(x-actor.x,y-actor.y);
+      if(d>best.d)best={x,y,d};
+      if(d>=minimum){best={x,y,d};break;}
+    }
+    actor.target=best.x;actor.targetY=best.y;
+  }
+  function moveActor(actor,x,y,speed,dt){
+    const dx=x-actor.x,dy=y-actor.y,d=Math.hypot(dx,dy),step=Math.min(d,speed*dt);
+    actor.el.classList.toggle('walking',d>1);
+    if(d>1){actor.x+=dx/d*step;actor.y+=dy/d*step;if(Math.abs(dx)>1)actor.el.classList.toggle('left',dx<0);}
+    return {arrived:d<=step+1,distance:step};
+  }
+  function say(actor,line,duration=3.8){
+    actors.forEach(a=>{a.speechTime=0;a.el.classList.remove('talking');});
+    actor.bubble.textContent=line;actor.speechTime=duration;actor.el.classList.add('talking');
+  }
+  function give(actor,snack){actor.gift.innerHTML=snacks[snack]||'';actor.el.classList.toggle('carrying',Boolean(snack));}
+  function paintActors(){
+    const b=walkBounds(),bubbleWidth=Math.min(w<=700?160:190,w-24);
+    actors.forEach(a=>{
+      a.el.style.transform=`translate3d(${a.x}px,${a.y}px,0)`;
+      const center=a.x+b.size/2;
+      a.bubble.style.setProperty('--bubble-shift',`${limit(center,12+bubbleWidth/2,w-12-bubbleWidth/2)-center}px`);
+    });
+  }
+  actors.forEach(actor=>{
+    const b=walkBounds();actor.x=limit(actor.x,b.minX,b.maxX);actor.y=limit(actor.y,b.minY,b.maxY);
+    Object.assign(actor,{pause:0,walked:0,speechTime:0,departed:false,bubble:actor.el.querySelector('.bubble')});
+    actor.gift=document.createElement('span');actor.gift.className='walker-gift';actor.gift.setAttribute('aria-hidden','true');actor.el.append(actor.gift);
+    walkTarget(actor);
+  });
+  function meetingPlace(gap){
+    const b=walkBounds(),margin=b.size/2+gap/2+10;
+    const center=limit(meeting.xFraction*w,Math.min(w/2,margin),Math.max(w/2,w-margin));
+    const y=limit(meeting.yFraction*h,Math.min(b.maxY,205),b.maxY);
+    return {center,y,targets:[center-b.size/2-gap/2,center-b.size/2+gap/2]};
+  }
+  function startMeeting(){
+    const scene=nextEncounter(),b=walkBounds();
+    meeting={scene,phase:scene.kind==='makeup'?'pout':'approach',time:0,replied:false,xFraction:between(w<=700 ? .46 : .3,w<=700 ? .54 : .7),yFraction:between(.6,.84)};
+    actors.forEach((a,i)=>{a.pause=0;a.speechTime=0;a.el.classList.remove('talking','walking');give(a,scene.gifts?.[i]);});
+    if(scene.kind==='makeup'){
+      const a=actors[scene.offended],other=actors[1-scene.offended];
+      meeting.xFraction=(a.x+b.size/2+(scene.offended===0?1:-1)*b.size*.18)/w;
+      meeting.yFraction=a.y/h;a.el.classList.add('pouting');a.el.classList.toggle('left',other.x>a.x);
+      say(a,scene.pout,2.7);
+    }
+  }
+  function finishMeeting(){
+    meeting=null;dispersing=true;meetingClock=0;
+    actors.forEach((a,i)=>{
+      a.el.classList.remove('running','talking','sharing','hugging','pouting','delighted');give(a,'');
+      a.pause=0;a.speechTime=0;a.departed=false;walkTarget(a,i);
+    });
+  }
+  function meetingUpdate(dt){
+    const scene=meeting.scene,b=walkBounds(),close=scene.kind!=='gift'||meeting.phase==='cuddle';
+    const place=meetingPlace(b.size*(close ? .36 : .72));meeting.time+=dt;
+    if(meeting.phase==='pout'){
+      if(meeting.time>=2.7){meeting.phase='approach';meeting.time=0;}
+      return;
+    }
+    if(meeting.phase==='approach'){
+      const arrived=actors.map((a,i)=>{
+        a.el.classList.add('running');return moveActor(a,place.targets[i],place.y,190,dt).arrived;
+      }).every(Boolean);
+      if(arrived){
+        meeting.phase='chat';meeting.time=0;
+        actors.forEach((a,i)=>{
+          a.el.classList.remove('running','walking','pouting');a.el.classList.toggle('left',i===1);
+          a.el.classList.add(close?'hugging':'sharing');
+        });
+        say(actors[scene.first],scene.lines[scene.first]);burst(place.center,place.y+15,18);chime();
+      }
+    }else if(meeting.phase==='chat'){
+      if(meeting.time>=3.8&&!meeting.replied){
+        meeting.replied=true;say(actors[1-scene.first],scene.lines[1-scene.first],4.1);
+        if(scene.kind==='gift')actors.forEach((a,i)=>{give(a,scene.gifts[1-i]);a.el.classList.add('delighted');});
+        burst(place.center,place.y+25,10);
+      }
+      if(meeting.time>=7.8){
+        if(scene.kind==='gift'){
+          meeting.phase='cuddle';meeting.time=0;
+          actors.forEach(a=>{give(a,'');a.el.classList.remove('sharing','delighted');a.el.classList.add('hugging');});
+          burst(place.center,place.y+15,12);
+        }else finishMeeting();
+      }
+    }else if(meeting.phase==='cuddle'){
+      actors.forEach((a,i)=>{moveActor(a,place.targets[i],place.y,65,dt);a.el.classList.remove('walking');a.el.classList.toggle('left',i===1);});
+      if(meeting.time>=2.8)finishMeeting();
+    }
+  }
+  function wanderUpdate(actor,dt){
+    if(dispersing&&actor.departed){actor.el.classList.remove('walking');return;}
+    if(actor.pause>0){actor.pause-=dt;actor.el.classList.remove('walking');return;}
+    const moved=moveActor(actor,actor.target,actor.targetY,dispersing?76:actor.speed,dt);
+    if(!dispersing)actor.walked+=moved.distance;
+    if(moved.arrived){
+      if(dispersing)actor.departed=true;
+      else{walkTarget(actor);actor.pause=between(.6,2.8);}
+    }
+  }
+  function companionsUpdate(dt){
+    const b=walkBounds();
+    actors.forEach(a=>{
+      a.x=limit(a.x,b.minX,b.maxX);a.y=limit(a.y,b.minY,b.maxY);
+      a.target=limit(a.target,b.minX,b.maxX);a.targetY=limit(a.targetY,b.minY,b.maxY);
+      a.speechTime=Math.max(0,a.speechTime-dt);if(!a.speechTime)a.el.classList.remove('talking');
+    });
+    if(meeting)meetingUpdate(dt);
+    else if(dispersing){
+      actors.forEach(a=>wanderUpdate(a,dt));
+      if(actors.every(a=>a.departed)){
+        // Полный новый интервал начинается только после расхождения героев.
+        dispersing=false;meetingClock=0;nextMeetingAfter=randomMeetingGap();
+        actors.forEach(a=>{a.walked=0;walkTarget(a);a.pause=between(.5,1.5);});
+      }
+    }else{
+      actors.forEach(a=>wanderUpdate(a,dt));meetingClock+=dt;
+      const minimumWalk=Math.min(180,Math.hypot(b.maxX-b.minX,b.maxY-b.minY)*.3);
+      if(meetingClock>=nextMeetingAfter&&actors.every(a=>a.walked>=minimumWalk&&!a.speechTime))startMeeting();
+    }
+    paintActors();
+  }
+  actors.forEach((actor,i)=>actor.el.addEventListener('click',()=>{
+    if(meeting||dispersing)return;
+    actor.pause=3.5;
+    const lines=[['Я рядом ♡','Люблю тебя','Твой Олег','Ты сегодня особенно красивая ♡'],['И я рядом ♡','Ещё одно сердечко?','Твоя Настя','Поймай мой воздушный поцелуй ♡']][i];
+    say(actor,lines[Math.floor(Math.random()*lines.length)],3.3);
+    const r=actor.el.getBoundingClientRect();burst(r.x+r.width/2,r.y+15,15);chime();
+  }));
   function animate(t){
     const dt=Math.min((t-last)/1000||.016,.05);last=t;ctx.clearRect(0,0,w,h);
     if(state.opened&&!reduced){
       if(t-lastRain>550&&particles.length<150){particles.push({x:Math.random()*w,y:-20,vx:(Math.random()-.5)*13,vy:23+Math.random()*24,size:4+Math.random()*8,life:45,angle:Math.random()*3,spin:(Math.random()-.5)*.4});lastRain=t;}
-      if(!window.LoveQuest?.active&&!document.querySelector('dialog[open]')&&!meetingUpdate(dt))actors.forEach(actor=>{const maxX=Math.max(6,w-100),maxY=Math.max(115,h-215);actor.x=Math.max(6,Math.min(maxX,actor.x));actor.y=Math.max(115,Math.min(maxY,actor.y));actor.target=Math.max(6,Math.min(maxX,actor.target));actor.targetY=Math.max(115,Math.min(maxY,actor.targetY));const dx=actor.target-actor.x,dy=actor.targetY-actor.y,dist=Math.hypot(dx,dy);if(actor.pause>0){actor.pause-=dt;actor.el.classList.remove('walking');}else if(dist<3){actor.target=6+Math.random()*Math.max(0,maxX-6);actor.targetY=Math.random()<.7?maxY:115+Math.random()*Math.max(0,maxY-115);actor.pause=1+Math.random()*3;}else{actor.x+=dx/dist*actor.speed*dt;actor.y+=dy/dist*actor.speed*dt;actor.el.classList.add('walking');actor.el.classList.toggle('left',dx<0);}actor.el.style.transform=`translate3d(${actor.x}px,${actor.y}px,0)`;});
+      if(!window.LoveQuest?.active&&!document.querySelector('dialog[open]'))companionsUpdate(dt);
     }
     particles=particles.filter(p=>p.life>0&&p.y<h+35);particles.forEach(p=>{p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.angle+=p.spin*dt;if(p.burst){p.vy+=65*dt;p.vx*=.994;}paintHeart(p);});
     frameId=requestAnimationFrame(animate);
@@ -262,7 +429,7 @@
     $('#experience').hidden=false;render();
     const intro=$('#intro');intro.style.position='fixed';intro.style.inset='0';intro.style.zIndex='20';intro.style.pointerEvents='none';
     if(reduced){intro.hidden=true;$('#stage h2')?.focus({preventScroll:true});}else{intro.animate([{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(1.08)'}],{duration:1050,fill:'forwards',easing:'cubic-bezier(.3,0,.2,1)'}).finished.then(()=>{intro.hidden=true;$('#stage h2')?.focus({preventScroll:true});});}
-    actors.forEach(actor=>actor.el.style.transform=`translate3d(${actor.x}px,${actor.y}px,0)`);last=performance.now();if(!reduced)frameId=requestAnimationFrame(animate);
+    paintActors();last=performance.now();if(!reduced)frameId=requestAnimationFrame(animate);
   }
   $('#open-story').addEventListener('click',startExperience);
   const introText='История пишется.\nИ мы сами пишем\nнашу историю.';let char=0;
