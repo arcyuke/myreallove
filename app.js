@@ -260,10 +260,9 @@
     {kind:'makeup',offended:0,first:1,pout:'Я немножко надулся…',lines:['Всё, больше не дуюсь. Иди в мои объятия ♡','Люблю тебя. Прости. Давай обнимемся?']}
   ];
   let encounterDeck=[],lastEncounter=null,meeting=null,dispersing=false;
-  let meetingClock=0,nextMeetingAfter=between(30,42);
+  let meetingClock=0,nextMeetingAfter=randomMeetingGap();
   function randomMeetingGap(){
-    const chance=Math.random();
-    return chance<.3?between(22,30):chance<.75?between(34,44):between(48,62);
+    return between(20,30);
   }
   function nextEncounter(){
     if(!encounterDeck.length){
